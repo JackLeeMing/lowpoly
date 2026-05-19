@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>OpenCV.js Canny Edge Detection</title>
+
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      color: white;
+      font-family: sans-serif;
+      overflow: hidden;
+    }
+
+    .toolbar {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      background: rgba(0,0,0,0.6);
+      padding: 16px;
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+    }
+
+    .toolbar label {
+      display: block;
+      margin-top: 10px;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+    }
+
+    canvas {
+      width: 50vw;
+      height: 100vh;
+      object-fit: contain;
+      background: #222;
+    }
+
+    input[type="range"] {
+      width: 220px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="toolbar">
+
+  <input type="file" id="fileInput" accept="image/*" />
+
+  <label>
+    threshold1:
+    <span id="t1Value">80</span>
+  </label>
+
+  <input
+    id="threshold1"
+    type="range"
+    min="0"
+    max="300"
+    value="80"
+  />
+
+  <label>
+    threshold2:
+    <span id="t2Value">160</span>
+  </label>
+
+  <input
+    id="threshold2"
+    type="range"
+    min="0"
+    max="300"
+    value="160"
+  />
+
+</div>
+
+<div class="container">
+  <canvas id="srcCanvas"></canvas>
+  <canvas id="dstCanvas"></canvas>
+</div>
+
+<script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+<script>
+  let srcMat = null
+
+  const fileInput = document.getElementById('fileInput')
+
+  const threshold1Input =
+    document.getElementById('threshold1')
+
+  const threshold2Input =
+    document.getElementById('threshold2')
+
+  const t1Value =
+    document.getElementById('t1Value')
+
+  const t2Value =
+    document.getElementById('t2Value')
+
+  const srcCanvas =
+    document.getElementById('srcCanvas')
+
+  const dstCanvas =
+    document.getElementById('dstCanvas')
+
+  function detectEdges() {
+
+    if (!srcMat) return
+
+    const gray = new cv.Mat()
+    const blur = new cv.Mat()
+    const edges = new cv.Mat()
+
+    // 转灰度
+    cv.cvtColor(
+      srcMat,
+      gray,
+      cv.COLOR_RGBA2GRAY
+    )
+
+    // 高斯模糊
+    cv.GaussianBlur(
+      gray,
+      blur,
+      new cv.Size(5, 5),
+      0
+    )
+
+    // Canny 边缘检测
+    cv.Canny(
+      blur,
+      edges,
+      Number(threshold1Input.value),
+      Number(threshold2Input.value)
+    )
+
+    cv.imshow('dstCanvas', edges)
+
+    gray.delete()
+    blur.delete()
+    edges.delete()
+  }
+
+  function loadImage(url) {
+
+    const img = new Image()
+
+    img.onload = () => {
+
+      srcCanvas.width = img.width
+      srcCanvas.height = img.height
+
+      dstCanvas.width = img.width
+      dstCanvas.height = img.height
+
+      const ctx =
+        srcCanvas.getContext('2d')
+
+      ctx.drawImage(img, 0, 0)
+
+      if (srcMat) {
+        srcMat.delete()
+      }
+
+      srcMat = cv.imread(srcCanvas)
+
+      detectEdges()
+    }
+
+    img.src = url
+  }
+
+  fileInput.addEventListener('change', e => {
+
+    const file = e.target.files[0]
+
+    if (!file) return
+
+    const url = URL.createObjectURL(file)
+
+    loadImage(url)
+
+    setTimeout(() => {
+      URL.revokeObjectURL(url)
+    }, 1000)
+  })
+
+  threshold1Input.addEventListener('input', () => {
+
+    t1Value.innerText = threshold1Input.value
+
+    detectEdges()
+  })
+
+  threshold2Input.addEventListener('input', () => {
+
+    t2Value.innerText = threshold2Input.value
+
+    detectEdges()
+  })
+
+  cv['onRuntimeInitialized'] = () => {
+
+    console.log('OpenCV.js Ready')
+
+    loadImage(
+      'https://picsum.photos/1200/800'
+    )
+  }
+</script>
+
+</body>
+</html>

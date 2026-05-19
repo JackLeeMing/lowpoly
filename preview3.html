@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Three.js Image Low Poly</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #111;
+      }
+
+      #file {
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        z-index: 10;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <input id="file" type="file" accept="image/*" />
+
+    <script type="module">
+      import * as THREE from "https://unpkg.com/three@0.184.0/build/three.module.js"; //'https://unpkg.com/three@0.164.1/build/three.module.js'
+
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+      });
+
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+
+      const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+      const geometry = new THREE.PlaneGeometry(2, 2);
+
+      const uniforms = {
+        uTexture: { value: null },
+        uResolution: {
+          value: new THREE.Vector2(window.innerWidth, window.innerHeight),
+        },
+        uCellSize: { value: 20.0 },
+      };
+
+      const material = new THREE.ShaderMaterial({
+        uniforms,
+
+        vertexShader: `
+      varying vec2 vUv;
+
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position, 1.0);
+      }
+    `,
+
+        fragmentShader: `
+      precision highp float;
+
+      uniform sampler2D uTexture;
+      uniform vec2 uResolution;
+      uniform float uCellSize;
+
+      varying vec2 vUv;
+
+      float random(vec2 p) {
+        return fract(
+          sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123
+        );
+      }
+
+      void main() {
+        vec2 uv = vUv;
+
+        vec2 grid = uv * uResolution / uCellSize;
+        vec2 cell = floor(grid);
+        vec2 local = fract(grid);
+
+        vec2 samplePoint;
+
+        if (local.x + local.y < 1.0) {
+          samplePoint = cell + vec2(0.33, 0.33);
+        } else {
+          samplePoint = cell + vec2(0.66, 0.66);
+        }
+
+        float offset = random(cell) * 0.25;
+
+        samplePoint += vec2(
+          random(cell + 1.0) - 0.5,
+          random(cell + 2.0) - 0.5
+        ) * offset;
+
+        vec2 sampleUv = samplePoint * uCellSize / uResolution;
+
+        vec4 color = texture2D(uTexture, sampleUv);
+
+        gl_FragColor = color;
+      }
+    `,
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      scene.add(mesh);
+
+      function loadImage(url) {
+        const loader = new THREE.TextureLoader();
+
+        loader.load(url, (texture) => {
+          texture.minFilter = THREE.LinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+          texture.colorSpace = THREE.SRGBColorSpace;
+
+          uniforms.uTexture.value = texture;
+          render();
+        });
+      }
+
+      function render() {
+        renderer.render(scene, camera);
+      }
+
+      document.getElementById("file").addEventListener("change", (e) => {
+        const file = e.target.files[0];
+
+        if (!file) return;
+
+        const url = URL.createObjectURL(file);
+
+        loadImage(url);
+
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+        }, 1000);
+      });
+
+      window.addEventListener("resize", () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+
+        render();
+      });
+
+      const defaultImage =
+        "https://threejs.org/examples/textures/uv_grid_opengl.jpg";
+
+      loadImage(defaultImage);
+    </script>
+  </body>
+</html>

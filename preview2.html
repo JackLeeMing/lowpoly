@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>Realtime Low Poly Camera</title>
+
+<style>
+  body {
+    margin: 0;
+    background: #0f172a;
+    overflow: hidden;
+    font-family: sans-serif;
+    color: white;
+  }
+
+  #panel {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 10;
+    background: rgba(0,0,0,.5);
+    padding: 12px;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+  }
+
+  canvas {
+    width: 100vw;
+    height: 100vh;
+    display: block;
+  }
+
+  input {
+    width: 200px;
+  }
+</style>
+</head>
+
+<body>
+
+<div id="panel">
+  <div>
+    点数量：
+    <input id="pointRange" type="range" min="100" max="2000" value="800">
+    <span id="pointText">800</span>
+  </div>
+
+  <div style="margin-top:10px;">
+    FPS: <span id="fps">0</span>
+  </div>
+</div>
+
+<video id="video" autoplay playsinline hidden></video>
+<canvas id="canvas"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/delaunator@5.0.1/delaunator.min.js"></script>
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+const pointRange = document.getElementById('pointRange');
+const pointText = document.getElementById('pointText');
+const fpsText = document.getElementById('fps');
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let points = [];
+let delaunay = null;
+
+let fps = 0;
+let lastTime = performance.now();
+let frameCount = 0;
+
+async function initCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      width: 640,
+      height: 480
+    },
+    audio: false
+  });
+
+  video.srcObject = stream;
+
+  await video.play();
+
+  generatePoints();
+
+  requestAnimationFrame(render);
+}
+
+function generatePoints() {
+  const count = Number(pointRange.value);
+
+  points = [];
+
+  // 边界点
+  for (let x = 0; x <= canvas.width; x += 40) {
+    points.push([x, 0]);
+    points.push([x, canvas.height]);
+  }
+
+  for (let y = 0; y <= canvas.height; y += 40) {
+    points.push([0, y]);
+    points.push([canvas.width, y]);
+  }
+
+  // 随机点
+  for (let i = 0; i < count; i++) {
+    points.push([
+      Math.random() * canvas.width,
+      Math.random() * canvas.height
+    ]);
+  }
+
+  delaunay = Delaunator.from(points);
+}
+
+pointRange.addEventListener('input', () => {
+  pointText.textContent = pointRange.value;
+  generatePoints();
+});
+
+function render() {
+
+  // 缩小视频提升性能
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  const imageData = ctx.getImageData(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+  const data = imageData.data;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const triangles = delaunay.triangles;
+
+  for (let i = 0; i < triangles.length; i += 3) {
+
+    const p1 = points[triangles[i]];
+    const p2 = points[triangles[i + 1]];
+    const p3 = points[triangles[i + 2]];
+
+    const cx = ((p1[0] + p2[0] + p3[0]) / 3) | 0;
+    const cy = ((p1[1] + p2[1] + p3[1]) / 3) | 0;
+
+    const index = (cy * canvas.width + cx) * 4;
+
+    const r = data[index];
+    const g = data[index + 1];
+    const b = data[index + 2];
+
+    ctx.beginPath();
+
+    ctx.moveTo(p1[0], p1[1]);
+    ctx.lineTo(p2[0], p2[1]);
+    ctx.lineTo(p3[0], p3[1]);
+
+    ctx.closePath();
+
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fill();
+  }
+
+  updateFPS();
+
+  requestAnimationFrame(render);
+}
+
+function updateFPS() {
+  frameCount++;
+
+  const now = performance.now();
+
+  if (now - lastTime >= 1000) {
+    fps = frameCount;
+    frameCount = 0;
+    lastTime = now;
+
+    fpsText.textContent = fps;
+  }
+}
+
+window.addEventListener('resize', () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  generatePoints();
+});
+
+initCamera();
+</script>
+
+</body>
+</html>
