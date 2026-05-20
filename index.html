@@ -79,8 +79,8 @@
     <script src="./opencv.js?v=4.x"></script>
 
     <script type="module">
-      import Delaunator from "https://cdn.skypack.dev/delaunator";
-
+      // import Delaunator from "https://cdn.skypack.dev/delaunator";
+      import Delaunator from "https://cdn.skypack.dev/delaunator@5.0.0";
       let srcMat = null;
 
       const fileInput = document.getElementById("fileInput");
@@ -112,15 +112,17 @@
       function extractEdgePoints(edgeMat) {
         const points = [];
 
-        const step = 6;
-
+        const step = 9; // 控制能取到多少边缘点
+        console.log(edgeMat.rows, edgeMat.cols);
+        // edgeMat.rows -- h
+        // edgeMat.cols -- w
         for (let y = 0; y < edgeMat.rows; y += step) {
           for (let x = 0; x < edgeMat.cols; x += step) {
             const value = edgeMat.ucharPtr(y, x)[0];
-
             if (value > 200) {
               points.push([x, y]);
             }
+            // points.push([x, y]);
           }
         }
 
@@ -217,8 +219,16 @@
         const edges = new cv.Mat();
 
         cv.cvtColor(srcMat, gray, cv.COLOR_RGBA2GRAY);
+        // cv.imshow(edgeCanvas, gray);、
+        // 高斯卷积核大小（Kernel Size） 必须是奇数
+        // 核越大：
 
-        cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
+        // 模糊越强
+        // 图像越平滑
+        // 细节丢失越多
+        cv.GaussianBlur(gray, blur, new cv.Size(3, 3), 0);
+
+        // cv.imshow(edgeCanvas, blur);
 
         cv.Canny(
           blur,
@@ -229,14 +239,14 @@
 
         cv.imshow(edgeCanvas, edges);
 
-        const edgePoints = extractEdgePoints(edges);
+        const edgePoints = extractEdgePoints(edges); // 提取高亮的点 边线
 
-        const randPoints = randomPoints(img.width, img.height, 1200);
+        const randPoints = randomPoints(img.width, img.height, 1500); // 1200
 
         const points = [
-          ...edgePoints,
+          // ...edgePoints,
           ...randPoints,
-
+          ...edgePoints,
           [0, 0],
           [img.width, 0],
           [0, img.height],
